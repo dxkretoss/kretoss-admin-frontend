@@ -1,207 +1,389 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useApp } from "@/context/AppContext";
+import { JobPostType } from "@/types/jobPost";
+import { toast } from "@/hooks/use-toast";
+import { SpinLoader } from "./ui/spin-loader";
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useApp } from '@/context/AppContext';
-import { Job } from '@/types';
-import { toast } from '@/hooks/use-toast';
-
-interface JobFormProps {
-  job?: Job | null;
-  onClose: () => void;
+interface FormData {
+  title: string;
+  slug: string;
+  category: string;
+  location: string;
+  experience: string;
+  jobType: string;
+  jobDescription: string;
+  status: string;
+  description: string;
+  keyResponsibilities: string[];
+  keyRequirements: string[];
+  niceToHave: string[];
 }
 
-const JobForm: React.FC<JobFormProps> = ({ job, onClose }) => {
-  const { addJob, updateJob } = useApp();
-  const [formData, setFormData] = useState({
-    title: '',
-    category: '',
-    experience: '',
-    jobType: 'Full-time' as Job['jobType'],
-    description: '',
-    responsibilities: '',
-    requirements: '',
-    niceToHave: '',
-    status: 'Active' as Job['status'],
+interface FormErrors {
+  [key: string]: string;
+}
+
+const JobFormPage: React.FC = () => {
+  const { jobs, addJob, updateJob, getJobById } = useApp();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+
+  const [formData, setFormData] = useState<FormData>({
+    slug: "",
+    title: "",
+    description: "",
+    category: "",
+    location: "",
+    experience: "",
+    jobType: "Full-time",
+    jobDescription: "",
+    status: "Active",
+    keyResponsibilities: [""],
+    keyRequirements: [""],
+    niceToHave: [""],
   });
 
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    if (job) {
-      setFormData({
-        title: job.title,
-        category: job.category,
-        experience: job.experience,
-        jobType: job.jobType,
-        description: job.description,
-        responsibilities: job.responsibilities,
-        requirements: job.requirements,
-        niceToHave: job.niceToHave,
-        status: job.status,
+    const fetchJob = async () => {
+      if (id) {
+        const jobFromApi = await getJobById(id);
+        if (jobFromApi) {
+          setFormData({
+            slug: jobFromApi.slug || "",
+            title: jobFromApi.title,
+            category: jobFromApi.category,
+            location: jobFromApi.location,
+            experience: jobFromApi.experience,
+            jobType: jobFromApi.jobType,
+            jobDescription: jobFromApi.jobDescription,
+            status: jobFromApi.status || "Active",
+            description: jobFromApi.description || "",
+            keyResponsibilities: jobFromApi.keyResponsibilities.length
+              ? jobFromApi.keyResponsibilities
+              : [""],
+            keyRequirements: jobFromApi.keyRequirements.length
+              ? jobFromApi.keyRequirements
+              : [""],
+            niceToHave: jobFromApi.niceToHave.length
+              ? jobFromApi.niceToHave
+              : [""],
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Job not found",
+            variant: "destructive",
+          });
+          navigate("/jobs"); // redirect if job not found
+        }
+      }
+    };
+
+    fetchJob();
+  }, [id]);
+
+  const handleChange = (field: keyof FormData, value: string) => {
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+      // auto-generate slug from title only if creating a new job
+      if (field === "title" && !id) {
+        updated.slug = value
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, "")
+          .replace(/\s+/g, "-");
+      }
+      return updated;
+    });
+  };
+
+  const handleArrayChange = (
+    field: keyof FormData,
+    idx: number,
+    value: string
+  ) => {
+    const arr = [...formData[field]];
+    arr[idx] = value;
+    setFormData((prev) => ({ ...prev, [field]: arr }));
+  };
+
+  const addArrayItem = (field: keyof FormData) => {
+    const arr = [...formData[field], ""];
+    setFormData((prev) => ({ ...prev, [field]: arr }));
+  };
+
+  const removeArrayItem = (field: keyof FormData, idx: number) => {
+    const arr = [...formData[field]];
+    if (arr.length > 1) {
+      arr.splice(idx, 1);
+      setFormData((prev) => ({ ...prev, [field]: arr }));
+    } else {
+      toast({
+        title: "Error",
+        description: `At least 1 ${field
+          .replace(/([A-Z])/g, " $1")
+          .toLowerCase()} is required.`,
       });
     }
-  }, [job]);
+  };
+
+  const validateForm = () => {
+    const newErrors: FormErrors = {};
+
+    if (!formData.slug.trim()) newErrors.slug = "Slug is required";
+    if (!formData.title.trim()) newErrors.title = "Job title is required";
+    if (!formData.category.trim()) newErrors.category = "Category is required";
+    if (!formData.location.trim()) newErrors.location = "Location is required";
+    if (!formData.experience.trim())
+      newErrors.experience = "Experience is required";
+    if (!formData.jobType.trim()) newErrors.jobType = "Job Type is required";
+    if (!formData.jobDescription.trim())
+      newErrors.jobDescription = "Job Description is required";
+    if (!formData.description.trim())
+      newErrors.description = "Description is required";
+
+    ["keyResponsibilities", "keyRequirements", "niceToHave"].forEach(
+      (field) => {
+        const arr = formData[field];
+        const fieldName = field.replace(/([A-Z])/g, " $1").toLowerCase();
+        if (!arr.length || arr.every((item) => !item.trim())) {
+          newErrors[field] = `At least one ${fieldName} is required`;
+        } else {
+          arr.forEach((item, idx) => {
+            if (!item.trim())
+              newErrors[`${field}_${idx}`] = `${fieldName} cannot be empty`;
+          });
+        }
+      }
+    );
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (job) {
-      updateJob(job.id, formData);
-      toast({
-        title: "Job Updated",
-        description: "The job post has been successfully updated.",
-      });
-    } else {
-      addJob(formData);
-      toast({
-        title: "Job Added",
-        description: "New job post has been successfully created.",
-      });
-    }
-    
-    onClose();
-  };
+    if (!validateForm()) return;
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setLoading(true);
+    setTimeout(async () => {
+      if (id) {
+        const result = await updateJob(id, formData);
+        setLoading(false);
+        if (result?.success) {
+          navigate("/jobs"); // ✅ only redirect if success
+        }
+      } else {
+        const result = await addJob(formData);
+        setLoading(false);
+        if (result?.success) {
+          navigate("/jobs"); // ✅ only redirect if success
+        }
+      }
+    }, 500);
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{job ? 'Edit Job Post' : 'Add New Job Post'}</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="w-full mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-4">
+        {id ? "Edit Job Post" : "Add New Job Post"}
+      </h1>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <SpinLoader />
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Job Title *</Label>
+              <Label>Job Title *</Label>
               <Input
-                id="title"
                 value={formData.title}
-                onChange={(e) => handleChange('title', e.target.value)}
-                required
+                onChange={(e) => handleChange("title", e.target.value)}
               />
+              {errors.title && (
+                <p className="text-red-500 text-sm">{errors.title}</p>
+              )}
             </div>
-            
             <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
+              <Label>Slug *</Label>
               <Input
-                id="category"
-                value={formData.category}
-                onChange={(e) => handleChange('category', e.target.value)}
-                required
+                value={formData.slug}
+                onChange={(e) => handleChange("slug", e.target.value)}
+                placeholder="Enter slug (or leave auto-generated)"
               />
+              {errors.slug && (
+                <p className="text-red-500 text-sm">{errors.slug}</p>
+              )}
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category *</Label>
+              <Input
+                value={formData.category}
+                onChange={(e) => handleChange("category", e.target.value)}
+              />
+              {errors.category && (
+                <p className="text-red-500 text-sm">{errors.category}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Location *</Label>
+              <Input
+                value={formData.location}
+                onChange={(e) => handleChange("location", e.target.value)}
+              />
+              {errors.location && (
+                <p className="text-red-500 text-sm">{errors.location}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Description *</Label>
+            <Textarea
+              value={formData.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+            />
+            {errors.description && (
+              <p className="text-red-500 text-sm">{errors.description}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="experience">Experience *</Label>
-              <Select value={formData.experience} onValueChange={(value) => handleChange('experience', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select experience" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0-1 years">0-1 years</SelectItem>
-                  <SelectItem value="1-2 years">1-2 years</SelectItem>
-                  <SelectItem value="2-3 years">2-3 years</SelectItem>
-                  <SelectItem value="3-5 years">3-5 years</SelectItem>
-                  <SelectItem value="5-7 years">5-7 years</SelectItem>
-                  <SelectItem value="7+ years">7+ years</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Experience *</Label>
+              <Input
+                value={formData.experience}
+                placeholder="e.g., 3-5 years"
+                onChange={(e) => handleChange("experience", e.target.value)}
+              />
+              {errors.experience && (
+                <p className="text-red-500 text-sm">{errors.experience}</p>
+              )}
             </div>
-            
             <div className="space-y-2">
               <Label htmlFor="jobType">Job Type *</Label>
-              <Select value={formData.jobType} onValueChange={(value: Job['jobType']) => handleChange('jobType', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Full-time">Full-time</SelectItem>
-                  <SelectItem value="Part-time">Part-time</SelectItem>
-                  <SelectItem value="Contract">Contract</SelectItem>
-                  <SelectItem value="Internship">Internship</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="jobType"
+                placeholder="Enter job type (e.g., Full-time)"
+                value={formData.jobType}
+                onChange={(e) => handleChange("jobType", e.target.value)}
+              />
+              {errors.jobType && (
+                <p className="text-red-500 text-sm">{errors.jobType}</p>
+              )}
             </div>
-            
             <div className="space-y-2">
-              <Label htmlFor="status">Status *</Label>
-              <Select value={formData.status} onValueChange={(value: Job['status']) => handleChange('status', value)}>
+              <Label>Status *</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => handleChange("status", value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                  <SelectItem value="Draft">Draft</SelectItem>
+                  {["ACTIVE", "INACTIVE", "DRAFT"].map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Job Description *</Label>
+            <Label>Job Description *</Label>
             <Textarea
-              id="description"
-              rows={4}
-              value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              required
+              value={formData.jobDescription}
+              onChange={(e) => handleChange("jobDescription", e.target.value)}
             />
+            {errors.jobDescription && (
+              <p className="text-red-500 text-sm">{errors.jobDescription}</p>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="responsibilities">Key Responsibilities *</Label>
-            <Textarea
-              id="responsibilities"
-              rows={4}
-              value={formData.responsibilities}
-              onChange={(e) => handleChange('responsibilities', e.target.value)}
-              required
-            />
-          </div>
+          {/* Array Fields */}
+          {(
+            [
+              "keyResponsibilities",
+              "keyRequirements",
+              "niceToHave",
+            ] as (keyof FormData)[]
+          ).map((field) => (
+            <div key={field} className="space-y-2">
+              <Label className="capitalize">
+                {field.replace(/([A-Z])/g, " $1")} *
+              </Label>
+              {errors[field] && (
+                <p className="text-red-500 text-sm">{errors[field]}</p>
+              )}
+              {(formData[field] as string[]).map((item, idx) => (
+                <div key={idx} className="flex gap-2 mb-1">
+                  <Input
+                    value={item}
+                    placeholder={`Enter ${field
+                      .replace(/([A-Z])/g, " $1")
+                      .toLowerCase()}`}
+                    onChange={(e) =>
+                      handleArrayChange(field, idx, e.target.value)
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => removeArrayItem(field, idx)}
+                  >
+                    Delete
+                  </Button>
+                  {errors[`${field}_${idx}`] && (
+                    <p className="text-red-500 text-sm">
+                      {errors[`${field}_${idx}`]}
+                    </p>
+                  )}
+                </div>
+              ))}
+              <Button type="button" onClick={() => addArrayItem(field)}>
+                Add {field.replace(/([A-Z])/g, " $1").toLowerCase()}
+              </Button>
+            </div>
+          ))}
 
-          <div className="space-y-2">
-            <Label htmlFor="requirements">Key Requirements *</Label>
-            <Textarea
-              id="requirements"
-              rows={4}
-              value={formData.requirements}
-              onChange={(e) => handleChange('requirements', e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="niceToHave">Nice to Have</Label>
-            <Textarea
-              id="niceToHave"
-              rows={3}
-              value={formData.niceToHave}
-              onChange={(e) => handleChange('niceToHave', e.target.value)}
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/jobs")}
+            >
               Cancel
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              {job ? 'Update Job' : 'Create Job'}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : id ? "Update Job" : "Create Job"}
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      )}
+    </div>
   );
 };
 
-export default JobForm;
+export default JobFormPage;
