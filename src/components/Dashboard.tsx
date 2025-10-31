@@ -48,7 +48,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => (
           <Card key={stat.title}>
-            <CardHeader className="flex justify-between pb-2">
+            <CardHeader className="flex flex-row justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
                 {stat.title}
               </CardTitle>

@@ -362,7 +362,11 @@ const JobFormPage: React.FC = () => {
                   )}
                 </div>
               ))}
-              <Button type="button" onClick={() => addArrayItem(field)}>
+              <Button
+                type="button"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => addArrayItem(field)}
+              >
                 Add {field.replace(/([A-Z])/g, " $1").toLowerCase()}
               </Button>
             </div>
@@ -376,7 +380,11 @@ const JobFormPage: React.FC = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={loading}
+            >
               {loading ? "Saving..." : id ? "Update Job" : "Create Job"}
             </Button>
           </div>
