@@ -1,11 +1,11 @@
 const dev = {
-  // API_ENDPOINT_URL: "https://kretossadminapi.kretosstechnology.com",
-  API_ENDPOINT_URL: "http://localhost:4011",
+  API_ENDPOINT_URL: "https://kretossadminapi.kretosstechnology.com",
+  // API_ENDPOINT_URL: "http://localhost:4011",
   BASE_URL: "http://localhost:8080/",
 };
 const prod = {
-  // API_ENDPOINT_URL: "https://kretossadminapi.kretosstechnology.com",
-  API_ENDPOINT_URL: "http://localhost:4011",
+  API_ENDPOINT_URL: "https://kretossadminapi.kretosstechnology.com",
+  // API_ENDPOINT_URL: "http://localhost:4011",
   BASE_URL: "http://localhost:8080/",
 };
 
